@@ -1,0 +1,167 @@
+import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import cors from '@fastify/cors';
+import websocketPlugin from '@fastify/websocket';
+import { v4 as uuidv4 } from 'uuid';
+import { AdapterRegistry } from '../adapters/index.js';
+import { Interceptor } from './interceptor.js';
+import { UpstreamDispatcher } from './upstream.js';
+import { WebSocketGateway } from '../ws/gateway.js';
+
+export interface ServerOptions {
+  port?: number;
+  initialMode?: 'observe' | 'control';
+}
+
+export function createLensgateServer(options: ServerOptions = {}): {
+  app: FastifyInstance;
+  interceptor: Interceptor;
+  wsGateway: WebSocketGateway;
+  start: () => Promise<void>;
+} {
+  const port = options.port || 8080;
+  const app = Fastify({ logger: false });
+
+  const registry = new AdapterRegistry();
+  const interceptor = new Interceptor(options.initialMode || 'observe');
+  const dispatcher = new UpstreamDispatcher();
+  const wsGateway = new WebSocketGateway(interceptor);
+
+  app.register(cors, { origin: '*' });
+  app.register(websocketPlugin);
+
+  // Health and management endpoints
+  app.get('/health', async () => ({ status: 'ok', name: 'Lensgate Proxy' }));
+
+  app.get('/api/status', async () => ({
+    mode: interceptor.getMode(),
+    pendingCount: interceptor.getPendingCount(),
+    port,
+  }));
+
+  app.get('/api/pending', async () => ({
+    pending: interceptor.getPendingEnvelopes(),
+  }));
+
+  app.post('/api/action/forward', async (req: FastifyRequest<{ Body: { requestId: string; modifiedBody?: any } }>, reply) => {
+    const { requestId, modifiedBody } = req.body || {};
+    const success = interceptor.resolve(requestId, 'forward', modifiedBody);
+    wsGateway.broadcastStatus();
+    return reply.status(success ? 200 : 404).send({ success });
+  });
+
+  app.post('/api/action/drop', async (req: FastifyRequest<{ Body: { requestId: string } }>, reply) => {
+    const { requestId } = req.body || {};
+    const success = interceptor.resolve(requestId, 'drop');
+    wsGateway.broadcastStatus();
+    return reply.status(success ? 200 : 404).send({ success });
+  });
+
+  app.post('/api/config/mode', async (req: FastifyRequest<{ Body: { mode: 'observe' | 'control' } }>, reply) => {
+    const { mode } = req.body || {};
+    if (mode === 'observe' || mode === 'control') {
+      interceptor.setMode(mode);
+      wsGateway.broadcastStatus();
+      return reply.send({ success: true, mode });
+    }
+    return reply.status(400).send({ error: 'Invalid mode' });
+  });
+
+  // WebSocket registration
+  app.register(async function (fastify) {
+    fastify.get('/ws', { websocket: true }, (connection) => {
+      wsGateway.addClient(connection);
+    });
+  });
+
+  // Core Interception Catch-All (excluding OPTIONS which is managed by fastify-cors)
+  app.route({
+    method: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    url: '/*',
+    handler: async (req: FastifyRequest, reply: FastifyReply) => {
+    if (req.url.startsWith('/api') || req.url.startsWith('/ws') || req.url === '/health') {
+      return;
+    }
+
+    const startTime = Date.now();
+    const requestId = uuidv4();
+    const headers = req.headers as Record<string, string | string[] | undefined>;
+    const body = req.body;
+
+    const adapter = registry.findAdapter(req.url, headers, body);
+    if (!adapter) {
+      return reply.status(400).send({
+        error: 'Unsupported AI model provider endpoint',
+        path: req.url,
+      });
+    }
+
+    const envelope = adapter.toEnvelope({
+      id: requestId,
+      path: req.url,
+      headers,
+      body,
+    });
+
+    // Notify UI of intercepted request
+    wsGateway.broadcastIntercepted(envelope);
+
+    // Enqueue or pass through depending on interceptor mode
+    const decision = await interceptor.enqueue(envelope);
+
+    if (decision.action === 'drop') {
+      wsGateway.broadcastCompleted(requestId, Date.now() - startTime, 403);
+      return reply.status(403).send({
+        error: 'Request dropped by developer in Lensgate',
+        requestId,
+      });
+    }
+
+    if (decision.modifiedBody) {
+      envelope.modifiedBody = decision.modifiedBody;
+    }
+
+    const upstreamPayload = adapter.toUpstreamPayload(envelope);
+
+    try {
+      const dispatchResult = await dispatcher.dispatch(
+        upstreamPayload,
+        adapter,
+        (chunkDelta) => {
+          wsGateway.broadcastStreamChunk(requestId, chunkDelta);
+        }
+      );
+
+      // Relay headers
+      for (const [key, val] of Object.entries(dispatchResult.headers)) {
+        if (!['content-length', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+          reply.header(key, val);
+        }
+      }
+
+      reply.status(dispatchResult.statusCode);
+
+      if (dispatchResult.isStream && typeof dispatchResult.body !== 'string') {
+        const nodeStream = (dispatchResult.body as any);
+        wsGateway.broadcastCompleted(requestId, Date.now() - startTime, dispatchResult.statusCode);
+        return reply.send(nodeStream);
+      } else {
+        wsGateway.broadcastCompleted(requestId, Date.now() - startTime, dispatchResult.statusCode);
+        return reply.send(dispatchResult.body);
+      }
+    } catch (err: any) {
+      wsGateway.broadcastCompleted(requestId, Date.now() - startTime, 502);
+      return reply.status(502).send({
+        error: 'Upstream gateway error',
+        message: err.message,
+      });
+    }
+  }
+});
+
+  const start = async () => {
+    await app.listen({ port, host: '0.0.0.0' });
+    console.log(`[Lensgate] Control Plane running on http://localhost:${port}`);
+  };
+
+  return { app, interceptor, wsGateway, start };
+}

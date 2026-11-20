@@ -10,10 +10,11 @@ import { AntigravityModal } from './components/AntigravityModal';
 import { IntelligenceAlertBanner } from './components/IntelligenceAlertBanner';
 import { ProjectScannerModal } from './components/ProjectScannerModal';
 import { WorkspaceTokenExplorer } from './components/WorkspaceTokenExplorer';
+import { AgentMemoryView } from './components/AgentMemoryView';
 import { Sparkles, Terminal } from 'lucide-react';
 
 export default function App() {
-  const [mainView, setMainView] = useState<'intercept' | 'workspace'>('intercept');
+  const [mainView, setMainView] = useState<'intercept' | 'memory' | 'workspace'>('memory');
   const [isAntigravityModalOpen, setIsAntigravityModalOpen] = useState(false);
   const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const {
@@ -151,7 +152,9 @@ export default function App() {
         onClose={() => setIsScannerModalOpen(false)}
       />
 
-      {mainView === 'workspace' ? (
+      {mainView === 'memory' ? (
+        <AgentMemoryView />
+      ) : mainView === 'workspace' ? (
         <WorkspaceTokenExplorer />
       ) : (
         <div className="flex flex-1 overflow-hidden">

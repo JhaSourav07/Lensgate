@@ -1,6 +1,6 @@
 import React from 'react';
 import { InterceptMode } from '@lensgate/shared';
-import { Shield, ShieldAlert, Eye, Cpu, Radio, Sparkles, Scan, FolderTree } from 'lucide-react';
+import { Shield, ShieldAlert, Eye, Cpu, Radio, Sparkles, Scan, FolderTree, Brain } from 'lucide-react';
 
 interface HeaderProps {
   connected: boolean;
@@ -9,8 +9,8 @@ interface HeaderProps {
   pendingCount: number;
   onOpenAntigravity: () => void;
   onOpenScanner?: () => void;
-  mainView: 'intercept' | 'workspace';
-  onViewChange: (view: 'intercept' | 'workspace') => void;
+  mainView: 'intercept' | 'memory' | 'workspace';
+  onViewChange: (view: 'intercept' | 'memory' | 'workspace') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -58,6 +58,18 @@ export const Header: React.FC<HeaderProps> = ({
               {pendingCount}
             </span>
           )}
+        </button>
+
+        <button
+          onClick={() => onViewChange('memory')}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+            mainView === 'memory'
+              ? 'bg-zinc-800 text-zinc-100 shadow-sm'
+              : 'text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <Brain className="w-3.5 h-3.5 text-emerald-400" />
+          <span>AI Agent Memory Context</span>
         </button>
 
         <button

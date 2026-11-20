@@ -19,6 +19,7 @@ import {
   extractCodeAttachmentsFromText,
   computeTokenBreakdown,
 } from '../intelligence/token-counter.js';
+import { TranscriptParser } from '../intelligence/transcript-parser.js';
 import { VerifiedProjectProfile, ContextCorrectionRule } from '@lensgate/shared';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,6 +56,7 @@ export function createLensgateServer(options: ServerOptions = {}): {
   const scanner = new ProjectScanner();
   const detector = new IntelligenceDetector();
   const rulesEngine = new RulesEngine();
+  const transcriptParser = new TranscriptParser();
 
   // Initialize project scan
   scanner.scan().catch(() => {});
@@ -110,50 +112,66 @@ export function createLensgateServer(options: ServerOptions = {}): {
       hookEventName?: string;
       cwd?: string;
       workspacePaths?: string[];
+      transcriptPath?: string;
     }
   }>, reply) => {
-    const { conversationId, lastUserInput, modelName, cwd } = req.body || {};
+    const { conversationId, lastUserInput, modelName, cwd, transcriptPath } = req.body || {};
     const requestId = uuidv4();
     const promptText = lastUserInput || 'Session Prompt';
 
-    const envelope: any = {
-      id: requestId,
-      timestamp: Date.now(),
-      sessionToken: conversationId,
-      provider: 'antigravity',
-      model: modelName || 'gemini-model',
-      stream: false,
-      context: {
-        systemInstructions: [
+    const tPath = transcriptPath || transcriptParser.findActiveTranscriptPath(conversationId);
+    let agentMemory = tPath ? transcriptParser.parseTranscript(tPath, cwd || process.cwd()) : null;
+
+    const systemInstructions = agentMemory?.systemInstructions?.length
+      ? agentMemory.systemInstructions
+      : [
           {
             id: 'sys-0',
             source: 'Antigravity Workspace',
             content: `Active Directory: ${cwd || process.cwd()}`,
             mutable: true,
           },
-        ],
-        conversationTurns: [
+        ];
+
+    const conversationTurns = agentMemory?.turns?.length
+      ? agentMemory.turns
+      : [
           {
             id: 'turn-0',
             role: 'user',
             content: promptText,
           },
-        ],
-        codeAttachments: [],
+        ];
+
+    const codeAttachments = agentMemory?.storedFiles?.length
+      ? transcriptParser.toCodeAttachments(agentMemory)
+      : extractCodeAttachmentsFromText(promptText);
+
+    const envelope: any = {
+      id: requestId,
+      timestamp: Date.now(),
+      sessionToken: conversationId || agentMemory?.conversationId,
+      provider: 'antigravity',
+      model: modelName || 'gemini-model',
+      stream: false,
+      context: {
+        systemInstructions,
+        conversationTurns,
+        codeAttachments,
         tools: [],
       },
       rawHeaders: req.headers as Record<string, string>,
       rawBody: {
         conversationId,
-        messages: [{ role: 'user', content: promptText }],
+        messages: conversationTurns.map((t) => ({ role: t.role, content: t.content })),
         model: modelName || 'gemini-model',
         cwd,
+        storedFiles: agentMemory?.storedFiles || [],
       },
       status: 'pending',
     };
 
-    // Extract attachments & compute token consumption breakdown
-    envelope.context.codeAttachments = extractCodeAttachmentsFromText(promptText);
+    // Compute token consumption breakdown with real memory files
     envelope.tokenBreakdown = computeTokenBreakdown(envelope.context);
 
     // Auto-apply active rules & analyze for misinterpretations/bloat/secrets
@@ -270,6 +288,16 @@ export function createLensgateServer(options: ServerOptions = {}): {
     const { dirPath } = req.body || {};
     const targetDir = dirPath || process.cwd();
     return scanWorkspaceTokens(targetDir);
+  });
+
+  // Active AI Agent Memory Context API
+  app.get('/api/context/agent-memory', async (req: FastifyRequest<{ Querystring: { conversationId?: string } }>) => {
+    const { conversationId } = req.query || {};
+    const tPath = transcriptParser.findActiveTranscriptPath(conversationId);
+    if (!tPath) {
+      return { error: 'No active agent transcript found', storedFiles: [], turns: [], systemInstructions: [] };
+    }
+    return transcriptParser.parseTranscript(tPath, process.cwd());
   });
 
   // WebSocket registration

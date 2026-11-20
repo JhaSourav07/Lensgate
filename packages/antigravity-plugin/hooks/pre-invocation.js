@@ -67,6 +67,7 @@ process.stdin.on('end', async () => {
         hookEventName: payload.hookEventName,
         cwd: payload.cwd,
         workspacePaths: payload.workspacePaths,
+        transcriptPath: payload.transcriptPath,
       }),
       signal: controller.signal,
     }).catch(() => null);

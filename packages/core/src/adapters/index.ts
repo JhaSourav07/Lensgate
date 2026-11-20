@@ -1,15 +1,18 @@
 import { BaseAdapter } from './base.js';
 import { OpenAIAdapter } from './openai.js';
 import { AnthropicAdapter } from './anthropic.js';
+import { GeminiAdapter } from './gemini.js';
 
 export * from './base.js';
 export * from './openai.js';
 export * from './anthropic.js';
+export * from './gemini.js';
 
 export class AdapterRegistry {
   private adapters: BaseAdapter[] = [
     new OpenAIAdapter(),
     new AnthropicAdapter(),
+    new GeminiAdapter(),
   ];
 
   register(adapter: BaseAdapter): void {
@@ -20,4 +23,3 @@ export class AdapterRegistry {
     return this.adapters.find((a) => a.matches(path, headers, body));
   }
 }
-

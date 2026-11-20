@@ -1,0 +1,6 @@
+{
+  "name": "lensgate",
+  "version": "0.1.0",
+  "description": "Lensgate AI Context Control: Visibility and control layer for Antigravity AI coding agents",
+  "hooks": "hooks.json"
+}

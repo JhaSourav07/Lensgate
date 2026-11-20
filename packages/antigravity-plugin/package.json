@@ -1,0 +1,7 @@
+{
+  "name": "@lensgate/antigravity-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Antigravity IDE lifecycle hooks for Lensgate AI Context Control"
+}

@@ -1,0 +1,21 @@
+{
+  "lensgate-context-control": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./hooks/pre-invocation.js"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./hooks/pre-tool.js"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ import { AdapterRegistry } from '../adapters/index.js';
 import { Interceptor } from './interceptor.js';
 import { UpstreamDispatcher } from './upstream.js';
 import { WebSocketGateway } from '../ws/gateway.js';
+import { MitmManager } from './mitm.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,12 +37,35 @@ export function createLensgateServer(options: ServerOptions = {}): {
   const interceptor = new Interceptor(options.initialMode || 'observe');
   const dispatcher = new UpstreamDispatcher();
   const wsGateway = new WebSocketGateway(interceptor);
+  const mitm = new MitmManager();
+
+  // Attach HTTP CONNECT listener for HTTPS proxying (Antigravity IDE, Cursor, etc.)
+  app.server.on('connect', (req, clientSocket, head) => {
+    mitm.handleConnect(
+      req,
+      clientSocket,
+      head,
+      registry,
+      interceptor,
+      dispatcher,
+      wsGateway
+    );
+  });
 
   app.register(cors, { origin: '*' });
   app.register(websocketPlugin);
 
   // Health and management endpoints
   app.get('/health', async () => ({ status: 'ok', name: 'Lensgate Proxy' }));
+
+  app.get('/api/ca.pem', async (_req, reply) => {
+    const caPath = mitm.getRootCaPath();
+    if (fs.existsSync(caPath)) {
+      const caBytes = fs.readFileSync(caPath);
+      return reply.type('application/x-x509-ca-cert').send(caBytes);
+    }
+    return reply.status(404).send({ error: 'CA certificate not found' });
+  });
 
   app.get('/api/status', async () => ({
     mode: interceptor.getMode(),

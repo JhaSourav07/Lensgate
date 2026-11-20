@@ -297,8 +297,11 @@ export function createLensgateServer(options: ServerOptions = {}): {
 
   // Workspace File & Token Explorer API
   app.post('/api/context/workspace-tokens', async (req: FastifyRequest<{ Body: { dirPath?: string } }>) => {
+    const root = findWorkspaceRoot();
     const { dirPath } = req.body || {};
-    const targetDir = dirPath ? path.resolve(dirPath) : findWorkspaceRoot();
+    const targetDir = dirPath
+      ? (path.isAbsolute(dirPath) ? dirPath : path.resolve(root, dirPath))
+      : root;
     return scanWorkspaceTokens(targetDir);
   });
 

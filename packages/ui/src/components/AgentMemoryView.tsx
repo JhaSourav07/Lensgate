@@ -81,6 +81,8 @@ export const AgentMemoryView: React.FC = () => {
   const [savingTurn, setSavingTurn] = useState<number | null>(null);
   const [turnSaveSuccess, setTurnSaveSuccess] = useState<number | null>(null);
   const [expandedThinking, setExpandedThinking] = useState<Record<number, boolean>>({});
+  const [turnFilterText, setTurnFilterText] = useState('');
+  const [scopeTurnsToFolder, setScopeTurnsToFolder] = useState(false);
 
   const fetchAgentMemory = async (folderOverride?: string) => {
     setLoading(true);
@@ -210,6 +212,29 @@ export const AgentMemoryView: React.FC = () => {
     data?.storedFiles?.filter((f) =>
       f.relativePath.toLowerCase().includes(filterText.toLowerCase())
     ) || [];
+
+  const filteredTurns = (data?.turns || []).filter((turn) => {
+    if (scopeTurnsToFolder && selectedFolder && selectedFolder !== 'all') {
+      const sf = selectedFolder.toLowerCase();
+      const contentMatch = (turn.content || '').toLowerCase().includes(sf);
+      const thinkingMatch = (turn.thinking || '').toLowerCase().includes(sf);
+      const toolMatch = (turn.toolCalls || []).some((tc) => {
+        const str = JSON.stringify(tc).toLowerCase();
+        return str.includes(sf);
+      });
+      if (!contentMatch && !thinkingMatch && !toolMatch) return false;
+    }
+
+    if (!turnFilterText) return true;
+    const q = turnFilterText.toLowerCase();
+    return (
+      (turn.content || '').toLowerCase().includes(q) ||
+      (turn.thinking || '').toLowerCase().includes(q) ||
+      turn.role.toLowerCase().includes(q) ||
+      String(turn.stepIndex).includes(q) ||
+      (turn.toolCalls || []).some((tc) => JSON.stringify(tc).toLowerCase().includes(q))
+    );
+  });
 
   const breakdown = data?.tokenBreakdown || {
     totalTokens: 0,
@@ -571,30 +596,60 @@ export const AgentMemoryView: React.FC = () => {
       ) : (
         /* Conversation History & Thinking Tab (Fully Editable!) */
         <div className="flex-1 overflow-y-auto p-6 space-y-4 max-w-4xl mx-auto w-full">
-          {/* History tab toolbar with Browse button */}
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-800 text-xs">
-            <div className="text-zinc-400 flex items-center space-x-2">
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <span>
-                Showing <strong className="text-zinc-200">{data?.turns?.length || 0}</strong> conversation turns in memory
-              </span>
-              {selectedFolder && selectedFolder !== 'all' && (
-                <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                  📁 {selectedFolder}
+          {/* History tab toolbar with Search & Browse */}
+          <div className="space-y-2.5 pb-3 border-b border-zinc-800 text-xs">
+            <div className="flex items-center justify-between">
+              <div className="text-zinc-400 flex items-center space-x-2">
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <span>
+                  Showing <strong className="text-zinc-200">{filteredTurns.length}</strong> of{' '}
+                  <span className="text-zinc-400">{data?.turns?.length || 0}</span> turns
                 </span>
+                {selectedFolder && selectedFolder !== 'all' && (
+                  <label className="flex items-center space-x-1.5 ml-2 cursor-pointer bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-[11px] text-zinc-300 hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={scopeTurnsToFolder}
+                      onChange={(e) => setScopeTurnsToFolder(e.target.checked)}
+                      className="rounded bg-zinc-800 border-zinc-700 text-emerald-500"
+                    />
+                    <span>Scope to {selectedFolder}</span>
+                  </label>
+                )}
+              </div>
+
+              <button
+                onClick={() => setIsBrowserOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-purple-300 text-xs font-semibold border border-purple-500/30 cursor-pointer transition-all active:scale-95"
+                title="Browse workspace folders"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
+                <span>Browse Folder</span>
+              </button>
+            </div>
+
+            {/* Turns search bar */}
+            <div className="flex items-center space-x-2 bg-zinc-900/60 border border-zinc-800 rounded-lg px-2.5 py-1.5">
+              <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <input
+                type="text"
+                value={turnFilterText}
+                onChange={(e) => setTurnFilterText(e.target.value)}
+                placeholder="Search conversation turns by content, model thinking, or tool call..."
+                className="w-full bg-transparent border-none text-xs text-zinc-200 focus:outline-none placeholder:text-zinc-500"
+              />
+              {turnFilterText && (
+                <button
+                  onClick={() => setTurnFilterText('')}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1"
+                >
+                  Clear
+                </button>
               )}
             </div>
-            <button
-              onClick={() => setIsBrowserOpen(true)}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-purple-300 text-xs font-semibold border border-purple-500/30 cursor-pointer transition-all active:scale-95"
-              title="Browse workspace folders"
-            >
-              <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
-              <span>Browse Folder</span>
-            </button>
           </div>
 
-          {data?.turns?.map((turn) => {
+          {filteredTurns.map((turn) => {
             const isUser = turn.role === 'user';
             const isEditing = editingTurnIndex === turn.stepIndex;
             const isSaving = savingTurn === turn.stepIndex;

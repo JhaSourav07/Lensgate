@@ -74,6 +74,16 @@ export const FolderBrowserModal: React.FC<FolderBrowserModalProps> = ({
     }
   }, [isOpen, initialPath]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleSelect = (pathOrRel: string) => {
@@ -210,10 +220,10 @@ export const FolderBrowserModal: React.FC<FolderBrowserModalProps> = ({
               {filteredSubfolders.map((sf) => (
                 <div
                   key={sf}
-                  className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/60 hover:bg-zinc-800/80 border border-zinc-800/70 hover:border-zinc-700 transition-all group cursor-pointer"
+                  className="flex items-center justify-between p-2 rounded-lg bg-zinc-950/80 hover:bg-zinc-800/90 border border-zinc-800/80 hover:border-zinc-700 transition-all group cursor-pointer"
                   onClick={() => loadFolder(`${data?.current}/${sf}`)}
                 >
-                  <div className="flex items-center space-x-2 min-w-0">
+                  <div className="flex items-center space-x-2 min-w-0 pr-2">
                     <Folder className="w-4 h-4 text-purple-400 group-hover:text-purple-300 shrink-0" />
                     <span className="text-xs font-mono text-zinc-300 group-hover:text-zinc-100 truncate">
                       {sf}
@@ -225,8 +235,8 @@ export const FolderBrowserModal: React.FC<FolderBrowserModalProps> = ({
                       const targetRel = activeRelPath ? `${activeRelPath}/${sf}` : sf;
                       handleSelect(targetRel);
                     }}
-                    className="opacity-0 group-hover:opacity-100 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shrink-0 cursor-pointer"
-                    title={`Select ${sf}`}
+                    className="px-2.5 py-1 rounded text-[10px] font-semibold bg-zinc-800 hover:bg-emerald-600 text-zinc-300 hover:text-white border border-zinc-700 hover:border-emerald-500 transition-all shrink-0 cursor-pointer shadow-sm active:scale-95"
+                    title={`Select folder: ${sf}`}
                   >
                     Select
                   </button>
@@ -262,3 +272,4 @@ export const FolderBrowserModal: React.FC<FolderBrowserModalProps> = ({
     </div>
   );
 };
+

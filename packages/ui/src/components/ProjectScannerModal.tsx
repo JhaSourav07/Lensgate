@@ -13,7 +13,9 @@ import {
   RefreshCw,
   Sliders,
   FileCode,
+  FolderOpen,
 } from 'lucide-react';
+import { FolderBrowserModal } from './FolderBrowserModal';
 
 interface ProjectScannerModalProps {
   isOpen: boolean;
@@ -33,6 +35,7 @@ export const ProjectScannerModal: React.FC<ProjectScannerModalProps> = ({
   const [scanPath, setScanPath] = useState('');
   const [purposeInput, setPurposeInput] = useState('');
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 
   // New rule state
   const [newRuleName, setNewRuleName] = useState('');
@@ -263,9 +266,18 @@ export const ProjectScannerModal: React.FC<ProjectScannerModalProps> = ({
                   className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-zinc-200 focus:outline-none focus:border-zinc-700"
                 />
                 <button
+                  type="button"
+                  onClick={() => setIsBrowserOpen(true)}
+                  className="flex items-center space-x-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-purple-300 rounded-lg text-xs font-semibold cursor-pointer border border-purple-500/30 transition-all active:scale-95"
+                  title="Browse workspace folders"
+                >
+                  <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
+                  <span>Browse</span>
+                </button>
+                <button
                   onClick={handleScan}
                   disabled={loading}
-                  className="flex items-center space-x-1.5 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+                  className="flex items-center space-x-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-sm active:scale-95"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                   <span>{loading ? 'Scanning...' : 'Scan Codebase'}</span>
@@ -512,6 +524,18 @@ export const ProjectScannerModal: React.FC<ProjectScannerModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Folder Browser Modal */}
+      <FolderBrowserModal
+        isOpen={isBrowserOpen}
+        onClose={() => setIsBrowserOpen(false)}
+        onSelectFolder={(folder) => {
+          setScanPath(folder);
+        }}
+        initialPath={scanPath}
+        title="Browse Workspace Folders"
+        subtitle="Select a directory to scan codebase architecture and purpose lock"
+      />
     </div>
   );
 };

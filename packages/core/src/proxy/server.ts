@@ -18,6 +18,7 @@ import {
   scanWorkspaceTokens,
   extractCodeAttachmentsFromText,
   computeTokenBreakdown,
+  estimateTokens,
 } from '../intelligence/token-counter.js';
 import { TranscriptParser } from '../intelligence/transcript-parser.js';
 import { VerifiedProjectProfile, ContextCorrectionRule } from '@lensgate/shared';
@@ -33,6 +34,17 @@ const potentialUiPaths = [
 export interface ServerOptions {
   port?: number;
   initialMode?: 'observe' | 'control';
+}
+
+function findWorkspaceRoot(startDir: string = process.cwd()): string {
+  let curr = path.resolve(startDir);
+  while (curr !== path.dirname(curr)) {
+    if (fs.existsSync(path.join(curr, 'pnpm-workspace.yaml'))) {
+      return curr;
+    }
+    curr = path.dirname(curr);
+  }
+  return startDir;
 }
 
 export function createLensgateServer(options: ServerOptions = {}): {
@@ -286,8 +298,80 @@ export function createLensgateServer(options: ServerOptions = {}): {
   // Workspace File & Token Explorer API
   app.post('/api/context/workspace-tokens', async (req: FastifyRequest<{ Body: { dirPath?: string } }>) => {
     const { dirPath } = req.body || {};
-    const targetDir = dirPath || process.cwd();
+    const targetDir = dirPath ? path.resolve(dirPath) : findWorkspaceRoot();
     return scanWorkspaceTokens(targetDir);
+  });
+
+  // Browse Directory / Presets for Folder Switching
+  app.get('/api/context/browse-folders', async (req: FastifyRequest<{ Querystring: { dir?: string } }>) => {
+    const root = findWorkspaceRoot();
+    const rawDir = req.query.dir ? path.resolve(req.query.dir) : root;
+    const resolved = path.resolve(rawDir);
+    const parent = path.dirname(resolved);
+    const subfolders: string[] = [];
+
+    if (fs.existsSync(resolved)) {
+      try {
+        const entries = fs.readdirSync(resolved, { withFileTypes: true });
+        for (const e of entries) {
+          if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist') {
+            subfolders.push(e.name);
+          }
+        }
+      } catch {}
+    }
+
+    const presets = [
+      { name: 'Monorepo Root', path: root },
+      { name: 'packages/core', path: path.join(root, 'packages', 'core') },
+      { name: 'packages/ui', path: path.join(root, 'packages', 'ui') },
+      { name: 'packages/shared', path: path.join(root, 'packages', 'shared') },
+      { name: 'packages/antigravity-plugin', path: path.join(root, 'packages', 'antigravity-plugin') },
+    ].filter((p) => fs.existsSync(p.path));
+
+    return {
+      current: resolved,
+      parent: parent !== resolved ? parent : null,
+      subfolders: subfolders.slice(0, 30),
+      presets,
+    };
+  });
+
+  // Read real file content for In-Place Editor
+  app.get('/api/context/file-content', async (req: FastifyRequest<{ Querystring: { path?: string } }>, reply) => {
+    const rawPath = req.query.path;
+    if (!rawPath) return reply.status(400).send({ error: 'Path required' });
+    const filePath = path.isAbsolute(rawPath) ? rawPath : path.resolve(findWorkspaceRoot(), rawPath);
+    if (!fs.existsSync(filePath)) {
+      return reply.status(404).send({ error: 'File not found' });
+    }
+    try {
+      const stats = fs.statSync(filePath);
+      if (stats.size > 5 * 1024 * 1024) {
+        return reply.status(400).send({ error: 'File too large (>5MB)' });
+      }
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const tokens = estimateTokens(content);
+      const lines = content.split('\n').length;
+      return { path: filePath, content, lines, sizeBytes: stats.size, tokens };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
+  });
+
+  // Save edited file back to disk
+  app.post('/api/context/save-file', async (req: FastifyRequest<{ Body: { path: string; content: string } }>, reply) => {
+    const { path: rawPath, content } = req.body || {};
+    if (!rawPath) return reply.status(400).send({ error: 'Path required' });
+    const filePath = path.isAbsolute(rawPath) ? rawPath : path.resolve(findWorkspaceRoot(), rawPath);
+    try {
+      fs.writeFileSync(filePath, content, 'utf-8');
+      const stats = fs.statSync(filePath);
+      const tokens = estimateTokens(content);
+      return { success: true, tokens, lines: content.split('\n').length, sizeBytes: stats.size };
+    } catch (err: any) {
+      return reply.status(500).send({ error: err.message });
+    }
   });
 
   // Active AI Agent Memory Context API

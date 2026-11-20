@@ -375,13 +375,39 @@ export function createLensgateServer(options: ServerOptions = {}): {
   });
 
   // Active AI Agent Memory Context API
-  app.get('/api/context/agent-memory', async (req: FastifyRequest<{ Querystring: { conversationId?: string } }>) => {
-    const { conversationId } = req.query || {};
+  app.get('/api/context/agent-memory', async (req: FastifyRequest<{ Querystring: { conversationId?: string; folder?: string } }>) => {
+    const { conversationId, folder } = req.query || {};
     const tPath = transcriptParser.findActiveTranscriptPath(conversationId);
     if (!tPath) {
-      return { error: 'No active agent transcript found', storedFiles: [], turns: [], systemInstructions: [] };
+      return { error: 'No active agent transcript found', storedFiles: [], turns: [], systemInstructions: [], availableFolders: [] };
     }
-    return transcriptParser.parseTranscript(tPath, process.cwd());
+    const root = findWorkspaceRoot();
+    return transcriptParser.parseTranscript(tPath, root, folder);
+  });
+
+  // Save edited file into Agent Memory (transcript on disk)
+  app.post('/api/context/save-memory-file', async (req: FastifyRequest<{ Body: { transcriptPath?: string; filePath: string; content: string } }>, reply) => {
+    const { transcriptPath, filePath, content } = req.body || {};
+    if (!filePath || content === undefined) return reply.status(400).send({ error: 'filePath and content required' });
+
+    const tPath = transcriptPath || transcriptParser.findActiveTranscriptPath();
+    if (!tPath) return reply.status(404).send({ error: 'No active agent session transcript found' });
+
+    const success = transcriptParser.updateFileInMemory(tPath, filePath, content);
+    const tokens = estimateTokens(content);
+    return reply.send({ success, tokens });
+  });
+
+  // Save edited turn (user input, model output, or model thinking) into Agent Memory (transcript on disk)
+  app.post('/api/context/save-memory-turn', async (req: FastifyRequest<{ Body: { transcriptPath?: string; stepIndex: number; content: string; thinking?: string } }>, reply) => {
+    const { transcriptPath, stepIndex, content, thinking } = req.body || {};
+    if (stepIndex === undefined) return reply.status(400).send({ error: 'stepIndex required' });
+
+    const tPath = transcriptPath || transcriptParser.findActiveTranscriptPath();
+    if (!tPath) return reply.status(404).send({ error: 'No active agent session transcript found' });
+
+    const success = transcriptParser.updateTurnInMemory(tPath, stepIndex, content, thinking);
+    return reply.send({ success });
   });
 
   // WebSocket registration

@@ -32,6 +32,14 @@ export interface CodeAttachment {
   tokenCount?: number;
 }
 
+export interface TokenBreakdown {
+  systemTokens: number;
+  turnsTokens: number;
+  codeTokens: number;
+  toolsTokens: number;
+  totalTokens: number;
+}
+
 export interface LensgateContextEnvelope {
   id: string;
   timestamp: number;
@@ -57,5 +65,6 @@ export interface LensgateContextEnvelope {
   status: InterceptStatus;
   modifiedBody?: any;
   alerts?: IntelligenceAlert[];
+  tokenBreakdown?: TokenBreakdown;
 }
 

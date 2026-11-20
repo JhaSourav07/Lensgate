@@ -14,6 +14,11 @@ import { AntigravityIntegrationManager } from '../integrations/antigravity.js';
 import { ProjectScanner } from '../intelligence/scanner.js';
 import { IntelligenceDetector } from '../intelligence/detector.js';
 import { RulesEngine } from '../intelligence/rules-engine.js';
+import {
+  scanWorkspaceTokens,
+  extractCodeAttachmentsFromText,
+  computeTokenBreakdown,
+} from '../intelligence/token-counter.js';
 import { VerifiedProjectProfile, ContextCorrectionRule } from '@lensgate/shared';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -147,6 +152,10 @@ export function createLensgateServer(options: ServerOptions = {}): {
       status: 'pending',
     };
 
+    // Extract attachments & compute token consumption breakdown
+    envelope.context.codeAttachments = extractCodeAttachmentsFromText(promptText);
+    envelope.tokenBreakdown = computeTokenBreakdown(envelope.context);
+
     // Auto-apply active rules & analyze for misinterpretations/bloat/secrets
     rulesEngine.applyAutoRules(envelope, scanner.getCachedProfile());
     envelope.alerts = detector.analyze(envelope, scanner.getCachedProfile());
@@ -250,9 +259,17 @@ export function createLensgateServer(options: ServerOptions = {}): {
     const result = rulesEngine.applyQuickFix(envelope, action, profile);
     if (result.modified) {
       envelope.alerts = detector.analyze(envelope, profile);
+      envelope.tokenBreakdown = computeTokenBreakdown(envelope.context);
       wsGateway.broadcastIntercepted(envelope);
     }
     return reply.send({ success: result.modified, envelope });
+  });
+
+  // Workspace File & Token Explorer API
+  app.post('/api/context/workspace-tokens', async (req: FastifyRequest<{ Body: { dirPath?: string } }>) => {
+    const { dirPath } = req.body || {};
+    const targetDir = dirPath || process.cwd();
+    return scanWorkspaceTokens(targetDir);
   });
 
   // WebSocket registration
@@ -314,6 +331,12 @@ export function createLensgateServer(options: ServerOptions = {}): {
       headers,
       body,
     });
+
+    const allContextText = envelope.context.conversationTurns
+      .map((t) => (typeof t.content === 'string' ? t.content : JSON.stringify(t.content)))
+      .join('\n');
+    envelope.context.codeAttachments = extractCodeAttachmentsFromText(allContextText);
+    envelope.tokenBreakdown = computeTokenBreakdown(envelope.context);
 
     // Auto-apply active rules & analyze for misinterpretations/bloat/secrets
     rulesEngine.applyAutoRules(envelope, scanner.getCachedProfile());

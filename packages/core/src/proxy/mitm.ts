@@ -15,6 +15,10 @@ import { WebSocketGateway } from '../ws/gateway.js';
 import { ProjectScanner } from '../intelligence/scanner.js';
 import { IntelligenceDetector } from '../intelligence/detector.js';
 import { RulesEngine } from '../intelligence/rules-engine.js';
+import {
+  extractCodeAttachmentsFromText,
+  computeTokenBreakdown,
+} from '../intelligence/token-counter.js';
 
 export class MitmManager {
   private certsDir: string;
@@ -204,6 +208,12 @@ export class MitmManager {
         headers,
         body,
       });
+
+      const allContextText = envelope.context.conversationTurns
+        .map((t) => (typeof t.content === 'string' ? t.content : JSON.stringify(t.content)))
+        .join('\n');
+      envelope.context.codeAttachments = extractCodeAttachmentsFromText(allContextText);
+      envelope.tokenBreakdown = computeTokenBreakdown(envelope.context);
 
       if (rulesEngine) {
         rulesEngine.applyAutoRules(envelope, scanner?.getCachedProfile());

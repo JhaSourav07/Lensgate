@@ -80,6 +80,76 @@ export function createLensgateServer(options: ServerOptions = {}): {
   app.post('/api/integrations/antigravity/attach', async () => antigravity.attach());
   app.post('/api/integrations/antigravity/detach', async () => antigravity.detach());
 
+  // Native Antigravity Hook Interception
+  app.post('/api/hook/intercept', async (req: FastifyRequest<{
+    Body: {
+      conversationId?: string;
+      lastUserInput?: string;
+      modelName?: string;
+      hookEventName?: string;
+      cwd?: string;
+      workspacePaths?: string[];
+    }
+  }>, reply) => {
+    const { conversationId, lastUserInput, modelName, cwd } = req.body || {};
+    const requestId = uuidv4();
+    const promptText = lastUserInput || 'Session Prompt';
+
+    const envelope: any = {
+      id: requestId,
+      timestamp: Date.now(),
+      sessionToken: conversationId,
+      provider: 'antigravity',
+      model: modelName || 'gemini-model',
+      stream: false,
+      context: {
+        systemInstructions: [
+          {
+            id: 'sys-0',
+            source: 'Antigravity Workspace',
+            content: `Active Directory: ${cwd || process.cwd()}`,
+            mutable: true,
+          },
+        ],
+        conversationTurns: [
+          {
+            id: 'turn-0',
+            role: 'user',
+            content: promptText,
+          },
+        ],
+        codeAttachments: [],
+        tools: [],
+      },
+      rawHeaders: req.headers as Record<string, string>,
+      rawBody: {
+        conversationId,
+        messages: [{ role: 'user', content: promptText }],
+        model: modelName || 'gemini-model',
+        cwd,
+      },
+      status: 'pending',
+    };
+
+    // Broadcast to UI
+    wsGateway.broadcastIntercepted(envelope);
+
+    // Enqueue in interceptor (pauses here if mode === 'control'!)
+    const decision = await interceptor.enqueue(envelope);
+
+    if (decision.action === 'drop') {
+      wsGateway.broadcastCompleted(requestId, Date.now() - envelope.timestamp, 403);
+      return reply.send({ action: 'drop', requestId });
+    }
+
+    wsGateway.broadcastCompleted(requestId, Date.now() - envelope.timestamp, 200);
+    return reply.send({
+      action: 'forward',
+      requestId,
+      modifiedBody: decision.modifiedBody,
+    });
+  });
+
   app.get('/api/pending', async () => ({
     pending: interceptor.getPendingEnvelopes(),
   }));

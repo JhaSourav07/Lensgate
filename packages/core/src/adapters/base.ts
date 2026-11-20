@@ -20,3 +20,4 @@ export interface BaseAdapter {
   toUpstreamPayload(envelope: LensgateContextEnvelope): UpstreamPayload;
   extractStreamDelta(chunk: string): string | null;
 }
+

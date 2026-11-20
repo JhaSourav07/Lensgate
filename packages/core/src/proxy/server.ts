@@ -18,7 +18,7 @@ export function createLensgateServer(options: ServerOptions = {}): {
   wsGateway: WebSocketGateway;
   start: () => Promise<void>;
 } {
-  const port = options.port || 8080;
+  const port = options.port || 8088;
   const app = Fastify({ logger: false });
 
   const registry = new AdapterRegistry();

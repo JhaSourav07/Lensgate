@@ -67,3 +67,4 @@ describe('Interceptor State Machine', () => {
     expect(interceptor.getPendingCount()).toBe(0);
   });
 });
+

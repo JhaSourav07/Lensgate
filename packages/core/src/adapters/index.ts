@@ -20,3 +20,4 @@ export class AdapterRegistry {
     return this.adapters.find((a) => a.matches(path, headers, body));
   }
 }
+

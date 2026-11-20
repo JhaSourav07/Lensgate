@@ -7,10 +7,12 @@ export * from './proxy/server.js';
 export * from './ws/gateway.js';
 
 if (process.argv[1] && process.argv[1].endsWith('index.js')) {
-  const port = parseInt(process.env.PORT || '8080', 10);
-  const server = createLensgateServer({ port });
+  const port = parseInt(process.env.PORT || '8088', 10);
+  const initialMode = (process.env.MODE === 'observe' ? 'observe' : 'control') as 'observe' | 'control';
+  const server = createLensgateServer({ port, initialMode });
   server.start().catch((err) => {
     console.error('[Lensgate] Fatal error starting server:', err);
     process.exit(1);
   });
 }
+

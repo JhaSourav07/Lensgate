@@ -5,6 +5,7 @@
   "scripts": {
     "build": "pnpm --filter \"@lensgate/*\" run build",
     "test": "pnpm --filter \"@lensgate/*\" run test",
+    "demo": "node scripts/demo.mjs",
     "start": "pnpm --filter \"@lensgate/core\" run start",
     "dev": "pnpm --filter \"@lensgate/core\" run dev"
   },
@@ -13,3 +14,4 @@
     "vitest": "^3.0.5"
   }
 }
+

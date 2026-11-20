@@ -139,3 +139,4 @@ export class OpenAIAdapter implements BaseAdapter {
     return deltaText || null;
   }
 }
+

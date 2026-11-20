@@ -55,3 +55,4 @@ export interface LensgateContextEnvelope {
   status: InterceptStatus;
   modifiedBody?: any;
 }
+

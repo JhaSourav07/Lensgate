@@ -45,3 +45,4 @@ describe('@lensgate/shared schema tests', () => {
     expect(clientAction.type).toBe('action:forward');
   });
 });
+

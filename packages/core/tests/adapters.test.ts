@@ -116,3 +116,4 @@ describe('AnthropicAdapter', () => {
     expect(adapter.extractStreamDelta(sse)).toBe('World');
   });
 });
+

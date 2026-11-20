@@ -146,3 +146,4 @@ export class AnthropicAdapter implements BaseAdapter {
     return deltaText || null;
   }
 }
+

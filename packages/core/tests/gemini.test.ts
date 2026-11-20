@@ -79,3 +79,4 @@ describe('GeminiAdapter', () => {
     expect(adapter.extractStreamDelta(sseChunk)).toBe('Evaluating password strength...');
   });
 });
+

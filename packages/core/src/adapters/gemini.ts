@@ -191,3 +191,4 @@ export class GeminiAdapter implements BaseAdapter {
     return deltaText || null;
   }
 }
+

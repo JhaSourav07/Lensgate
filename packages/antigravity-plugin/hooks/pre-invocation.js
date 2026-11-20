@@ -46,3 +46,4 @@ process.stdin.on('end', async () => {
   process.stdout.write('{}');
   process.exit(0);
 });
+

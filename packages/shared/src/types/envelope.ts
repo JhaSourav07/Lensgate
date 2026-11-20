@@ -1,3 +1,5 @@
+import { IntelligenceAlert } from './intelligence.js';
+
 export type ProviderType = 'openai' | 'anthropic' | 'gemini' | 'antigravity' | 'ollama' | 'generic';
 export type InterceptStatus = 'pending' | 'forwarded' | 'modified' | 'dropped';
 export type InterceptMode = 'observe' | 'control';
@@ -54,5 +56,6 @@ export interface LensgateContextEnvelope {
 
   status: InterceptStatus;
   modifiedBody?: any;
+  alerts?: IntelligenceAlert[];
 }
 

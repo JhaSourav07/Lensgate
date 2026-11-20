@@ -211,6 +211,35 @@ export function useLensgateWs() {
     );
   }, []);
 
+  const applyFix = useCallback(async (requestId: string, action: string) => {
+    try {
+      const res = await fetch('/api/intelligence/fix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, action }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.envelope) {
+          setItems((prev) =>
+            prev.map((item) =>
+              item.envelope.id === requestId
+                ? {
+                    ...item,
+                    envelope: data.envelope,
+                    modifiedBody: data.envelope.modifiedBody,
+                  }
+                : item
+            )
+          );
+          return data.envelope;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to apply fix:', err);
+    }
+  }, []);
+
   return {
     connected,
     mode,
@@ -221,6 +250,7 @@ export function useLensgateWs() {
     forwardRequest,
     dropRequest,
     updateItemModifiedBody,
+    applyFix,
   };
 }
 

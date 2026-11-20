@@ -5,6 +5,7 @@ export * from './proxy/interceptor.js';
 export * from './proxy/upstream.js';
 export * from './proxy/server.js';
 export * from './ws/gateway.js';
+export * from './intelligence/index.js';
 
 if (process.argv[1] && process.argv[1].endsWith('index.js')) {
   const port = parseInt(process.env.PORT || '8088', 10);

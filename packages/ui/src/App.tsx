@@ -7,10 +7,13 @@ import { ContextInspector } from './components/ContextInspector';
 import { RawJsonEditor } from './components/RawJsonEditor';
 import { DiffEditorView } from './components/DiffEditorView';
 import { AntigravityModal } from './components/AntigravityModal';
+import { IntelligenceAlertBanner } from './components/IntelligenceAlertBanner';
+import { ProjectScannerModal } from './components/ProjectScannerModal';
 import { Sparkles, Terminal } from 'lucide-react';
 
 export default function App() {
   const [isAntigravityModalOpen, setIsAntigravityModalOpen] = useState(false);
+  const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
   const {
     connected,
     mode,
@@ -21,6 +24,7 @@ export default function App() {
     forwardRequest,
     dropRequest,
     updateItemModifiedBody,
+    applyFix,
   } = useLensgateWs();
 
   const [activeTab, setActiveTab] = useState<'inspector' | 'editor' | 'diff' | 'response'>('inspector');
@@ -67,6 +71,14 @@ export default function App() {
   const handleDrop = () => {
     if (!selectedItem) return;
     dropRequest(selectedItem.envelope.id);
+  };
+
+  const handleApplyFix = async (action: string) => {
+    if (!selectedItem) return;
+    const updatedEnv = await applyFix(selectedItem.envelope.id, action);
+    if (updatedEnv?.modifiedBody) {
+      setEditorText(JSON.stringify(updatedEnv.modifiedBody, null, 2));
+    }
   };
 
   const handleQuickOverride = () => {
@@ -122,11 +134,17 @@ export default function App() {
         onModeChange={setMode}
         pendingCount={pendingCount}
         onOpenAntigravity={() => setIsAntigravityModalOpen(true)}
+        onOpenScanner={() => setIsScannerModalOpen(true)}
       />
 
       <AntigravityModal
         isOpen={isAntigravityModalOpen}
         onClose={() => setIsAntigravityModalOpen(false)}
+      />
+
+      <ProjectScannerModal
+        isOpen={isScannerModalOpen}
+        onClose={() => setIsScannerModalOpen(false)}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -150,6 +168,12 @@ export default function App() {
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
                 hasModifications={hasModifications}
+              />
+
+              <IntelligenceAlertBanner
+                alerts={selectedItem.envelope.alerts || []}
+                onApplyFix={handleApplyFix}
+                isPending={selectedItem.envelope.status === 'pending'}
               />
 
               <div className="flex-1 overflow-hidden relative">

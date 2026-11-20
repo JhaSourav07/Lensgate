@@ -12,6 +12,9 @@ import { AdapterRegistry } from '../adapters/index.js';
 import { Interceptor } from './interceptor.js';
 import { UpstreamDispatcher } from './upstream.js';
 import { WebSocketGateway } from '../ws/gateway.js';
+import { ProjectScanner } from '../intelligence/scanner.js';
+import { IntelligenceDetector } from '../intelligence/detector.js';
+import { RulesEngine } from '../intelligence/rules-engine.js';
 
 export class MitmManager {
   private certsDir: string;
@@ -110,7 +113,10 @@ export class MitmManager {
     registry: AdapterRegistry,
     interceptor: Interceptor,
     dispatcher: UpstreamDispatcher,
-    wsGateway: WebSocketGateway
+    wsGateway: WebSocketGateway,
+    scanner?: ProjectScanner,
+    detector?: IntelligenceDetector,
+    rulesEngine?: RulesEngine
   ): void {
     const [hostname, portStr] = (req.url || '').split(':');
     const port = parseInt(portStr || '443', 10);
@@ -198,6 +204,13 @@ export class MitmManager {
         headers,
         body,
       });
+
+      if (rulesEngine) {
+        rulesEngine.applyAutoRules(envelope, scanner?.getCachedProfile());
+      }
+      if (detector) {
+        envelope.alerts = detector.analyze(envelope, scanner?.getCachedProfile());
+      }
 
       wsGateway.broadcastIntercepted(envelope);
       const decision = await interceptor.enqueue(envelope);

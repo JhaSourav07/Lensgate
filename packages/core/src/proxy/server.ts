@@ -11,6 +11,10 @@ import { UpstreamDispatcher } from './upstream.js';
 import { WebSocketGateway } from '../ws/gateway.js';
 import { MitmManager } from './mitm.js';
 import { AntigravityIntegrationManager } from '../integrations/antigravity.js';
+import { ProjectScanner } from '../intelligence/scanner.js';
+import { IntelligenceDetector } from '../intelligence/detector.js';
+import { RulesEngine } from '../intelligence/rules-engine.js';
+import { VerifiedProjectProfile, ContextCorrectionRule } from '@lensgate/shared';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -29,6 +33,9 @@ export function createLensgateServer(options: ServerOptions = {}): {
   app: FastifyInstance;
   interceptor: Interceptor;
   wsGateway: WebSocketGateway;
+  scanner: ProjectScanner;
+  detector: IntelligenceDetector;
+  rulesEngine: RulesEngine;
   start: () => Promise<void>;
 } {
   const port = options.port || 8088;
@@ -40,6 +47,12 @@ export function createLensgateServer(options: ServerOptions = {}): {
   const wsGateway = new WebSocketGateway(interceptor);
   const mitm = new MitmManager();
   const antigravity = new AntigravityIntegrationManager();
+  const scanner = new ProjectScanner();
+  const detector = new IntelligenceDetector();
+  const rulesEngine = new RulesEngine();
+
+  // Initialize project scan
+  scanner.scan().catch(() => {});
 
   // Attach HTTP CONNECT listener for HTTPS proxying (Antigravity IDE, Cursor, etc.)
   app.server.on('connect', (req, clientSocket, head) => {
@@ -50,7 +63,10 @@ export function createLensgateServer(options: ServerOptions = {}): {
       registry,
       interceptor,
       dispatcher,
-      wsGateway
+      wsGateway,
+      scanner,
+      detector,
+      rulesEngine
     );
   });
 
@@ -131,6 +147,10 @@ export function createLensgateServer(options: ServerOptions = {}): {
       status: 'pending',
     };
 
+    // Auto-apply active rules & analyze for misinterpretations/bloat/secrets
+    rulesEngine.applyAutoRules(envelope, scanner.getCachedProfile());
+    envelope.alerts = detector.analyze(envelope, scanner.getCachedProfile());
+
     // Broadcast to UI
     wsGateway.broadcastIntercepted(envelope);
 
@@ -176,6 +196,63 @@ export function createLensgateServer(options: ServerOptions = {}): {
       return reply.send({ success: true, mode });
     }
     return reply.status(400).send({ error: 'Invalid mode' });
+  });
+
+  // Intelligence & Context Scanner endpoints
+  app.post('/api/intelligence/scan', async (req: FastifyRequest<{ Body: { rootDir?: string } }>) => {
+    const { rootDir } = req.body || {};
+    return scanner.scan(rootDir || process.cwd());
+  });
+
+  app.get('/api/intelligence/profile', async () => {
+    let profile = scanner.getCachedProfile();
+    if (!profile) {
+      profile = await scanner.scan(process.cwd());
+    }
+    return profile;
+  });
+
+  app.post('/api/intelligence/profile', async (req: FastifyRequest<{ Body: VerifiedProjectProfile }>) => {
+    if (req.body) {
+      scanner.setCachedProfile(req.body);
+      return { success: true, profile: req.body };
+    }
+    return { success: false };
+  });
+
+  app.get('/api/intelligence/rules', async () => {
+    return { rules: rulesEngine.getRules() };
+  });
+
+  app.post('/api/intelligence/rules', async (req: FastifyRequest<{ Body: ContextCorrectionRule }>) => {
+    const rule = req.body;
+    rulesEngine.addRule(rule);
+    return { success: true, rule };
+  });
+
+  app.patch('/api/intelligence/rules/:id', async (req: FastifyRequest<{ Params: { id: string }; Body: Partial<ContextCorrectionRule> }>) => {
+    const success = rulesEngine.updateRule(req.params.id, req.body);
+    return { success };
+  });
+
+  app.delete('/api/intelligence/rules/:id', async (req: FastifyRequest<{ Params: { id: string } }>) => {
+    const success = rulesEngine.deleteRule(req.params.id);
+    return { success };
+  });
+
+  app.post('/api/intelligence/fix', async (req: FastifyRequest<{ Body: { requestId: string; action: string } }>, reply) => {
+    const { requestId, action } = req.body || {};
+    const pendingEnvelopes = interceptor.getPendingEnvelopes();
+    const envelope = pendingEnvelopes.find((e) => e.id === requestId);
+    if (!envelope) return reply.status(404).send({ error: 'Request not pending' });
+
+    const profile = scanner.getCachedProfile();
+    const result = rulesEngine.applyQuickFix(envelope, action, profile);
+    if (result.modified) {
+      envelope.alerts = detector.analyze(envelope, profile);
+      wsGateway.broadcastIntercepted(envelope);
+    }
+    return reply.send({ success: result.modified, envelope });
   });
 
   // WebSocket registration
@@ -238,6 +315,10 @@ export function createLensgateServer(options: ServerOptions = {}): {
       body,
     });
 
+    // Auto-apply active rules & analyze for misinterpretations/bloat/secrets
+    rulesEngine.applyAutoRules(envelope, scanner.getCachedProfile());
+    envelope.alerts = detector.analyze(envelope, scanner.getCachedProfile());
+
     // Notify UI of intercepted request
     wsGateway.broadcastIntercepted(envelope);
 
@@ -299,5 +380,5 @@ export function createLensgateServer(options: ServerOptions = {}): {
     console.log(`[Lensgate] Control Plane running on http://localhost:${port}`);
   };
 
-  return { app, interceptor, wsGateway, start };
+  return { app, interceptor, wsGateway, scanner, detector, rulesEngine, start };
 }

@@ -12,11 +12,13 @@ import {
   ExternalLink,
   ArrowUp,
   Folder,
+  FolderOpen,
   Save,
   AlertCircle,
   Clock,
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+import { FolderBrowserModal } from './FolderBrowserModal';
 
 interface FileTokenInfo {
   path: string;
@@ -60,6 +62,7 @@ export const WorkspaceTokenExplorer: React.FC = () => {
   const [savingFile, setSavingFile] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [contextLimit, setContextLimit] = useState<number>(128000); // Default 128k context (GPT-4o / Claude 3.5 Sonnet)
+  const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 
   const fetchWorkspaceTokens = async (targetPath?: string) => {
     const pathToAnalyze = (targetPath !== undefined ? targetPath : dirPath).trim();
@@ -207,6 +210,15 @@ export const WorkspaceTokenExplorer: React.FC = () => {
                 className="w-96 bg-zinc-950 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-200 focus:outline-none focus:border-purple-500 transition-all"
               />
             </div>
+
+            <button
+              onClick={() => setIsBrowserOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-purple-300 rounded-lg text-xs font-semibold cursor-pointer border border-purple-500/30 transition-all active:scale-95"
+              title="Browse workspace folders"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
+              <span>Browse</span>
+            </button>
 
             <button
               onClick={() => fetchWorkspaceTokens(dirPath)}
@@ -519,6 +531,19 @@ export const WorkspaceTokenExplorer: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Folder Browser Modal */}
+      <FolderBrowserModal
+        isOpen={isBrowserOpen}
+        onClose={() => setIsBrowserOpen(false)}
+        onSelectFolder={(folder) => {
+          setDirPath(folder);
+          fetchWorkspaceTokens(folder);
+        }}
+        initialPath={dirPath}
+        title="Browse Workspace Folders"
+        subtitle="Select any directory in the workspace to analyze token consumption"
+      />
     </div>
   );
 };

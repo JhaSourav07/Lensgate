@@ -9,6 +9,7 @@ import {
   Search,
   BookOpen,
   Folder,
+  FolderOpen,
   Save,
   Check,
   Lightbulb,
@@ -18,6 +19,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import Editor from '@monaco-editor/react';
+import { FolderBrowserModal } from './FolderBrowserModal';
 
 interface StoredFile {
   path: string;
@@ -66,6 +68,7 @@ export const AgentMemoryView: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<StoredFile | null>(null);
   const [fileContent, setFileContent] = useState('');
   const [activeTab, setActiveTab] = useState<'files' | 'history'>('files');
+  const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 
   // Saving state
   const [savingFile, setSavingFile] = useState(false);
@@ -243,7 +246,7 @@ export const AgentMemoryView: React.FC = () => {
             </div>
           </div>
 
-          {/* Folder Filter Input & Refresh */}
+          {/* Folder Filter Input, Browse & Refresh */}
           <div className="flex items-center space-x-2">
             <input
               type="text"
@@ -258,6 +261,14 @@ export const AgentMemoryView: React.FC = () => {
               className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg text-xs font-semibold cursor-pointer transition-all border border-zinc-700"
             >
               Apply Folder
+            </button>
+            <button
+              onClick={() => setIsBrowserOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-750 text-purple-300 rounded-lg text-xs font-semibold cursor-pointer transition-all border border-purple-500/30 active:scale-95"
+              title="Browse workspace folders"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
+              <span>Browse</span>
             </button>
             <button
               onClick={() => fetchAgentMemory()}
@@ -427,7 +438,7 @@ export const AgentMemoryView: React.FC = () => {
           {/* Left: Stored Files */}
           <div className="w-2/5 border-r border-zinc-800 flex flex-col bg-zinc-950">
             <div className="p-3 border-b border-zinc-800 flex items-center space-x-2 bg-zinc-900/50">
-              <Search className="w-3.5 h-3.5 text-zinc-500" />
+              <Search className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
               <input
                 type="text"
                 value={filterText}
@@ -435,6 +446,14 @@ export const AgentMemoryView: React.FC = () => {
                 placeholder="Filter files stored in memory..."
                 className="bg-transparent border-none text-xs text-zinc-200 focus:outline-none w-full"
               />
+              <button
+                onClick={() => setIsBrowserOpen(true)}
+                className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-zinc-800 hover:bg-zinc-700 text-purple-300 text-[11px] font-semibold border border-purple-500/30 shrink-0 cursor-pointer transition-all active:scale-95"
+                title="Browse workspace folders"
+              >
+                <FolderOpen className="w-3 h-3 text-purple-400" />
+                <span>Browse</span>
+              </button>
             </div>
 
             <div className="flex-1 overflow-y-auto divide-y divide-zinc-900">
@@ -552,6 +571,29 @@ export const AgentMemoryView: React.FC = () => {
       ) : (
         /* Conversation History & Thinking Tab (Fully Editable!) */
         <div className="flex-1 overflow-y-auto p-6 space-y-4 max-w-4xl mx-auto w-full">
+          {/* History tab toolbar with Browse button */}
+          <div className="flex items-center justify-between pb-3 border-b border-zinc-800 text-xs">
+            <div className="text-zinc-400 flex items-center space-x-2">
+              <MessageSquare className="w-4 h-4 text-emerald-400" />
+              <span>
+                Showing <strong className="text-zinc-200">{data?.turns?.length || 0}</strong> conversation turns in memory
+              </span>
+              {selectedFolder && selectedFolder !== 'all' && (
+                <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  📁 {selectedFolder}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setIsBrowserOpen(true)}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-purple-300 text-xs font-semibold border border-purple-500/30 cursor-pointer transition-all active:scale-95"
+              title="Browse workspace folders"
+            >
+              <FolderOpen className="w-3.5 h-3.5 text-purple-400" />
+              <span>Browse Folder</span>
+            </button>
+          </div>
+
           {data?.turns?.map((turn) => {
             const isUser = turn.role === 'user';
             const isEditing = editingTurnIndex === turn.stepIndex;
@@ -699,6 +741,16 @@ export const AgentMemoryView: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Folder Browser Modal */}
+      <FolderBrowserModal
+        isOpen={isBrowserOpen}
+        onClose={() => setIsBrowserOpen(false)}
+        onSelectFolder={(folder) => handleFolderChange(folder)}
+        initialPath={selectedFolder === 'all' ? '' : selectedFolder}
+        title="Browse Workspace Folders"
+        subtitle="Select a directory to scope files and context history"
+      />
     </div>
   );
 };

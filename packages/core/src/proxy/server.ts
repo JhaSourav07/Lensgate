@@ -305,8 +305,10 @@ export function createLensgateServer(options: ServerOptions = {}): {
   // Browse Directory / Presets for Folder Switching
   app.get('/api/context/browse-folders', async (req: FastifyRequest<{ Querystring: { dir?: string } }>) => {
     const root = findWorkspaceRoot();
-    const rawDir = req.query.dir ? path.resolve(req.query.dir) : root;
-    const resolved = path.resolve(rawDir);
+    const targetDir = req.query.dir
+      ? (path.isAbsolute(req.query.dir) ? req.query.dir : path.resolve(root, req.query.dir))
+      : root;
+    const resolved = path.resolve(targetDir);
     const parent = path.dirname(resolved);
     const subfolders: string[] = [];
 
@@ -314,25 +316,29 @@ export function createLensgateServer(options: ServerOptions = {}): {
       try {
         const entries = fs.readdirSync(resolved, { withFileTypes: true });
         for (const e of entries) {
-          if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist') {
+          if (e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules' && e.name !== 'dist' && e.name !== '.git') {
             subfolders.push(e.name);
           }
         }
+        subfolders.sort();
       } catch {}
     }
 
+    const relPath = path.relative(root, resolved);
     const presets = [
-      { name: 'Monorepo Root', path: root },
-      { name: 'packages/core', path: path.join(root, 'packages', 'core') },
-      { name: 'packages/ui', path: path.join(root, 'packages', 'ui') },
-      { name: 'packages/shared', path: path.join(root, 'packages', 'shared') },
-      { name: 'packages/antigravity-plugin', path: path.join(root, 'packages', 'antigravity-plugin') },
+      { name: 'Monorepo Root', path: root, relativePath: '' },
+      { name: 'packages/core', path: path.join(root, 'packages', 'core'), relativePath: 'packages/core' },
+      { name: 'packages/ui', path: path.join(root, 'packages', 'ui'), relativePath: 'packages/ui' },
+      { name: 'packages/shared', path: path.join(root, 'packages', 'shared'), relativePath: 'packages/shared' },
+      { name: 'packages/antigravity-plugin', path: path.join(root, 'packages', 'antigravity-plugin'), relativePath: 'packages/antigravity-plugin' },
     ].filter((p) => fs.existsSync(p.path));
 
     return {
+      root,
       current: resolved,
-      parent: parent !== resolved ? parent : null,
-      subfolders: subfolders.slice(0, 30),
+      relativePath: relPath === '' ? '' : relPath,
+      parent: parent !== resolved && resolved.startsWith(root) ? parent : (resolved !== root ? root : null),
+      subfolders: subfolders.slice(0, 50),
       presets,
     };
   });

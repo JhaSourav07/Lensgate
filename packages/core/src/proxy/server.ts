@@ -35,7 +35,7 @@ export function createLensgateServer(options: ServerOptions = {}): {
   const app = Fastify({ logger: false });
 
   const registry = new AdapterRegistry();
-  const interceptor = new Interceptor(options.initialMode || 'observe');
+  const interceptor = new Interceptor(options.initialMode || 'control');
   const dispatcher = new UpstreamDispatcher();
   const wsGateway = new WebSocketGateway(interceptor);
   const mitm = new MitmManager();

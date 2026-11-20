@@ -12,11 +12,11 @@ interface PendingEntry {
 }
 
 export class Interceptor {
-  private mode: InterceptMode = 'observe';
+  private mode: InterceptMode = 'control';
   private pending = new Map<string, PendingEntry>();
   private defaultTimeoutMs = 120000;
 
-  constructor(initialMode: InterceptMode = 'observe') {
+  constructor(initialMode: InterceptMode = 'control') {
     this.mode = initialMode;
   }
 

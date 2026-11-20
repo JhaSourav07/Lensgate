@@ -36,3 +36,4 @@ export const DiffEditorView: React.FC<DiffEditorViewProps> = ({
     </div>
   );
 };
+

@@ -128,3 +128,4 @@ export const InterceptToolbar: React.FC<InterceptToolbarProps> = ({
     </div>
   );
 };
+

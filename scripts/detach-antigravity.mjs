@@ -11,3 +11,4 @@ if (result.success) {
   console.error('\x1b[31m[x] ' + result.message + '\x1b[0m');
   process.exit(1);
 }
+

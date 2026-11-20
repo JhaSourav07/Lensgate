@@ -2,10 +2,21 @@ import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import cors from '@fastify/cors';
 import websocketPlugin from '@fastify/websocket';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { AdapterRegistry } from '../adapters/index.js';
 import { Interceptor } from './interceptor.js';
 import { UpstreamDispatcher } from './upstream.js';
 import { WebSocketGateway } from '../ws/gateway.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const potentialUiPaths = [
+  path.resolve(__dirname, '../../../ui/dist'),
+  path.resolve(process.cwd(), 'packages/ui/dist'),
+  path.resolve(process.cwd(), 'ui/dist'),
+];
 
 export interface ServerOptions {
   port?: number;
@@ -75,11 +86,35 @@ export function createLensgateServer(options: ServerOptions = {}): {
 
   // Core Interception Catch-All (excluding OPTIONS which is managed by fastify-cors)
   app.route({
-    method: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+    method: ['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH'],
     url: '/*',
     handler: async (req: FastifyRequest, reply: FastifyReply) => {
     if (req.url.startsWith('/api') || req.url.startsWith('/ws') || req.url === '/health') {
       return;
+    }
+
+    // Serve Lensgate Dashboard UI if requested
+    if ((req.method === 'GET' || req.method === 'HEAD') && (req.url === '/' || req.url.startsWith('/assets/') || req.url === '/vite.svg' || !req.url.startsWith('/v1'))) {
+      const uiDist = potentialUiPaths.find((p) => fs.existsSync(p));
+      if (uiDist) {
+        let filePath = path.join(uiDist, req.url === '/' ? 'index.html' : req.url);
+        if (!fs.existsSync(filePath)) {
+          filePath = path.join(uiDist, 'index.html');
+        }
+        if (fs.existsSync(filePath)) {
+          const ext = path.extname(filePath);
+          const mimeTypes: Record<string, string> = {
+            '.html': 'text/html; charset=utf-8',
+            '.js': 'application/javascript; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.svg': 'image/svg+xml',
+            '.json': 'application/json',
+          };
+          const contentType = mimeTypes[ext] || 'text/plain';
+          const content = fs.readFileSync(filePath);
+          return reply.type(contentType).send(content);
+        }
+      }
     }
 
     const startTime = Date.now();

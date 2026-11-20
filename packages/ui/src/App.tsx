@@ -6,9 +6,11 @@ import { InterceptToolbar } from './components/InterceptToolbar';
 import { ContextInspector } from './components/ContextInspector';
 import { RawJsonEditor } from './components/RawJsonEditor';
 import { DiffEditorView } from './components/DiffEditorView';
+import { AntigravityModal } from './components/AntigravityModal';
 import { Sparkles, Terminal } from 'lucide-react';
 
 export default function App() {
+  const [isAntigravityModalOpen, setIsAntigravityModalOpen] = useState(false);
   const {
     connected,
     mode,
@@ -119,6 +121,12 @@ export default function App() {
         mode={mode}
         onModeChange={setMode}
         pendingCount={pendingCount}
+        onOpenAntigravity={() => setIsAntigravityModalOpen(true)}
+      />
+
+      <AntigravityModal
+        isOpen={isAntigravityModalOpen}
+        onClose={() => setIsAntigravityModalOpen(false)}
       />
 
       <div className="flex flex-1 overflow-hidden">

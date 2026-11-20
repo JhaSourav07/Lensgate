@@ -1,12 +1,13 @@
 import React from 'react';
 import { InterceptMode } from '@lensgate/shared';
-import { Shield, ShieldAlert, Eye, Cpu, Radio } from 'lucide-react';
+import { Shield, ShieldAlert, Eye, Cpu, Radio, Sparkles } from 'lucide-react';
 
 interface HeaderProps {
   connected: boolean;
   mode: InterceptMode;
   onModeChange: (mode: InterceptMode) => void;
   pendingCount: number;
+  onOpenAntigravity: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   mode,
   onModeChange,
   pendingCount,
+  onOpenAntigravity,
 }) => {
   return (
     <header className="h-14 border-b border-zinc-800 bg-zinc-900/90 px-4 flex items-center justify-between select-none shrink-0">
@@ -69,6 +71,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span>{pendingCount} Paused</span>
           </div>
         )}
+
+        {/* Antigravity Integration Pill */}
+        <button
+          onClick={onOpenAntigravity}
+          className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-zinc-300 text-xs font-medium transition-all cursor-pointer"
+          title="Manage Antigravity IDE connection"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Antigravity</span>
+        </button>
 
         {/* Connection status */}
         <div className="flex items-center space-x-1.5 text-xs text-zinc-400 pl-2 border-l border-zinc-800">

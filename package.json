@@ -6,6 +6,8 @@
     "build": "pnpm --filter \"@lensgate/*\" run build",
     "test": "pnpm --filter \"@lensgate/*\" run test",
     "demo": "node scripts/demo.mjs",
+    "attach:antigravity": "node scripts/attach-antigravity.mjs",
+    "detach:antigravity": "node scripts/detach-antigravity.mjs",
     "start": "pnpm --filter \"@lensgate/core\" run start",
     "dev": "pnpm --filter \"@lensgate/core\" run dev"
   },

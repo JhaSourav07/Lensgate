@@ -10,6 +10,7 @@ import { Interceptor } from './interceptor.js';
 import { UpstreamDispatcher } from './upstream.js';
 import { WebSocketGateway } from '../ws/gateway.js';
 import { MitmManager } from './mitm.js';
+import { AntigravityIntegrationManager } from '../integrations/antigravity.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,6 +39,7 @@ export function createLensgateServer(options: ServerOptions = {}): {
   const dispatcher = new UpstreamDispatcher();
   const wsGateway = new WebSocketGateway(interceptor);
   const mitm = new MitmManager();
+  const antigravity = new AntigravityIntegrationManager();
 
   // Attach HTTP CONNECT listener for HTTPS proxying (Antigravity IDE, Cursor, etc.)
   app.server.on('connect', (req, clientSocket, head) => {
@@ -72,6 +74,11 @@ export function createLensgateServer(options: ServerOptions = {}): {
     pendingCount: interceptor.getPendingCount(),
     port,
   }));
+
+  // Antigravity integration management
+  app.get('/api/integrations/antigravity/status', async () => antigravity.getStatus());
+  app.post('/api/integrations/antigravity/attach', async () => antigravity.attach());
+  app.post('/api/integrations/antigravity/detach', async () => antigravity.detach());
 
   app.get('/api/pending', async () => ({
     pending: interceptor.getPendingEnvelopes(),

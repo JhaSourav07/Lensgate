@@ -125,3 +125,4 @@ export class IntelligenceDetector {
     return alerts;
   }
 }
+

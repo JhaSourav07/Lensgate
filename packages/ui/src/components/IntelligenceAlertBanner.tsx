@@ -93,3 +93,4 @@ export const IntelligenceAlertBanner: React.FC<IntelligenceAlertBannerProps> = (
     </div>
   );
 };
+

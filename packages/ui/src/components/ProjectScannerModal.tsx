@@ -515,3 +515,4 @@ export const ProjectScannerModal: React.FC<ProjectScannerModalProps> = ({
     </div>
   );
 };
+
